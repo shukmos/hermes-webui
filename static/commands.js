@@ -23,6 +23,7 @@ const COMMANDS=[
   {name:'interrupt', desc:t('cmd_interrupt'), fn:cmdInterrupt, arg:'message', noEcho:true},
   {name:'steer',     desc:t('cmd_steer'),    fn:cmdSteer,     arg:'message', noEcho:true},
   {name:'title',     desc:t('cmd_title'),    fn:cmdTitle,    arg:'[title]'},
+  {name:'close',     desc:t('cmd_close'),    fn:cmdClose,    noEcho:true},
   {name:'retry',     desc:t('cmd_retry'),    fn:cmdRetry,     noEcho:true},
   {name:'undo',      desc:t('cmd_undo'),     fn:cmdUndo,      noEcho:true},
   {name:'btw',       desc:t('cmd_btw'),      fn:cmdBtw,       arg:'question', noEcho:true},
@@ -811,6 +812,21 @@ async function cmdTitle(args){
     renderMessages();
   }catch(e){showToast(t('failed_colon')+e.message);}
 }
+async function cmdClose(){
+  if(!S.session){showToast(t('no_active_session'));return;}
+  const currentTitle=S.session.title||'Untitled';
+  if(currentTitle.startsWith('✓')){showToast(t('cmd_close_already'));return;}
+  const closedTitle=`✓ ${currentTitle}`;
+  try{
+    const r=await api('/api/session/rename',{method:'POST',body:JSON.stringify({session_id:S.session.session_id,title:closedTitle})});
+    if(r&&r.error){showToast(r.error);return;}
+    S.session.title=closedTitle;
+    if(typeof syncTopbar==='function')syncTopbar();
+    if(typeof renderSessionList==='function')renderSessionList();
+    showToast(`${t('cmd_close_done')} "${closedTitle}"`);
+  }catch(e){showToast(t('failed_colon')+e.message);}
+}
+
 async function cmdRetry(){
   if(!S.session){showToast(t('no_active_session'));return;}
   if(S.session.is_cli_session){showToast(t('cmd_webui_only_session'));return;}

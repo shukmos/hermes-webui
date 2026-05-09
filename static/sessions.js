@@ -20,6 +20,40 @@ let _loadingSessionId = null;
 const SESSION_VIEWED_COUNTS_KEY = 'hermes-session-viewed-counts';
 const SESSION_COMPLETION_UNREAD_KEY = 'hermes-session-completion-unread';
 const SESSION_OBSERVED_STREAMING_KEY = 'hermes-session-observed-streaming';
+
+// ── セッション番号管理 (#N プレフィックス) ───────────────────────────────────
+const SESSION_NUMBERS_KEY = 'hermes-session-numbers';
+const SESSION_NEXT_NUMBER_KEY = 'hermes-next-session-number';
+
+function _getSessionNumbers() {
+  try { return JSON.parse(localStorage.getItem(SESSION_NUMBERS_KEY) || '{}'); } catch(_) { return {}; }
+}
+
+function _assignSessionNumber(sid) {
+  if (!sid) return 0;
+  const numbers = _getSessionNumbers();
+  if (numbers[sid]) return numbers[sid];
+  let next = parseInt(localStorage.getItem(SESSION_NEXT_NUMBER_KEY) || '1', 10);
+  if (!Number.isFinite(next) || next < 1) next = 1;
+  numbers[sid] = next;
+  localStorage.setItem(SESSION_NUMBERS_KEY, JSON.stringify(numbers));
+  localStorage.setItem(SESSION_NEXT_NUMBER_KEY, String(next + 1));
+  return next;
+}
+
+function _getSessionNumber(sid) {
+  if (!sid) return 0;
+  return _getSessionNumbers()[sid] || 0;
+}
+
+// タイトルに #N プレフィックスを付与する（既にある場合はスキップ）
+function _withSessionNumber(sid, title) {
+  const n = _getSessionNumber(sid);
+  if (!n) return title;
+  // 既に #N または ✓ #N プレフィックスがあれば何もしない
+  if (/^#\d+ /.test(title) || /^✓ #\d+ /.test(title) || /^✓ /.test(title)) return title;
+  return `#${n} ${title}`;
+}
 let _sessionViewedCounts = null;
 let _sessionCompletionUnread = null;
 let _sessionObservedStreaming = null;
@@ -306,6 +340,7 @@ async function newSession(flash){
   if(_activeProject&&_activeProject!==NO_PROJECT_FILTER) reqBody.project_id=_activeProject;
   const data=await api('/api/session/new',{method:'POST',body:JSON.stringify(reqBody)});
   S.session=data.session;S.messages=data.session.messages||[];
+  _assignSessionNumber(S.session.session_id);
   S.lastUsage={...(data.session.last_usage||{})};
   if(flash)S.session._flash=true;
   localStorage.setItem('hermes-webui-session',S.session.session_id);

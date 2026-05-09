@@ -212,7 +212,10 @@ async function send(){
   // Set provisional title from user message immediately so session appears
   // in the sidebar right away with a meaningful name (server may refine later)
   if(S.session&&(S.session.title==='Untitled'||!S.session.title)){
-    const provisionalTitle=displayText.slice(0,64);
+    const rawProvisional=displayText.slice(0,64);
+    const provisionalTitle=(typeof _withSessionNumber==='function')
+      ? _withSessionNumber(activeSid, rawProvisional)
+      : rawProvisional;
     S.session.title=provisionalTitle;
     syncTopbar();
     // Persist it in the background; keep the optimistic sidebar cache as the
@@ -865,8 +868,15 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       let d={};
       try{ d=JSON.parse(e.data||'{}'); }catch(_){}
       if((d.session_id||activeSid)!==activeSid) return;
-      const newTitle=String(d.title||'').trim();
-      if(!newTitle) return;
+      const rawTitle=String(d.title||'').trim();
+      if(!rawTitle) return;
+      // #N プレフィックスを付与してサーバーに保存
+      const newTitle=(typeof _withSessionNumber==='function')
+        ? _withSessionNumber(activeSid, rawTitle)
+        : rawTitle;
+      if(newTitle!==rawTitle){
+        api('/api/session/rename',{method:'POST',body:JSON.stringify({session_id:activeSid,title:newTitle})}).catch(()=>{});
+      }
       if(S.session&&S.session.session_id===activeSid){
         S.session.title=newTitle;
         syncTopbar();
